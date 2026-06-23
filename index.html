@@ -65,6 +65,11 @@
   .mini .v{font-family:"Baloo 2";font-weight:600;font-size:19px}
   .mini.exp .v{color:var(--bean-deep)}
   .mini.inc .v{color:var(--sage)}
+  .month-nav{display:flex;align-items:center;justify-content:center;gap:14px;margin:2px 0 16px}
+  .m-arrow{width:34px;height:34px;border-radius:11px;border:1.5px solid var(--line);background:var(--milk);color:var(--ink-soft);font-family:"Baloo 2";font-size:22px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .m-arrow:hover:not(:disabled){border-color:var(--bean);color:var(--bean-deep)}
+  .m-arrow:disabled{opacity:.3;cursor:default}
+  .month-label{font-size:15px;font-weight:700;min-width:130px;text-align:center;color:var(--ink)}
 
   /* weekly */
   .week-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px}
@@ -258,6 +263,7 @@ const catMap={};[...EXP_CATS,...INC_CATS].forEach(c=>catMap[c.id]=c);
 
 let data={transactions:[],weeklyLimit:0};
 let activeTab='main';
+let viewYM=(function(){const d=new Date();return{y:d.getFullYear(),m:d.getMonth()};})();
 let editingId=null;
 let form={type:'expense',cat:'food'};
 
@@ -314,10 +320,21 @@ function weekSpent(){
 function balance(){
   return data.transactions.reduce((s,t)=>s+(t.type==='income'?t.amount:-t.amount),0);
 }
-function monthSum(type){
-  const now=new Date(),y=now.getFullYear(),m=now.getMonth();
-  return data.transactions.filter(t=>{const d=new Date(t.date);return d.getFullYear()===y&&d.getMonth()===m&&t.type===type;})
+function monthSum(type,y,m){
+  return data.transactions.filter(t=>{const d=new Date(t.date+'T00:00:00');return d.getFullYear()===y&&d.getMonth()===m&&t.type===type;})
     .reduce((s,t)=>s+t.amount,0);
+}
+function monthTx(y,m){
+  return data.transactions.filter(t=>{const d=new Date(t.date+'T00:00:00');return d.getFullYear()===y&&d.getMonth()===m;});
+}
+function curYM(){const d=new Date();return{y:d.getFullYear(),m:d.getMonth()};}
+function isCurrentYM(){const c=curYM();return viewYM.y===c.y&&viewYM.m===c.m;}
+function shiftMonth(delta){
+  let m=viewYM.m+delta,y=viewYM.y;
+  if(m<0){m=11;y--;} if(m>11){m=0;y++;}
+  const c=curYM();
+  if(y>c.y||(y===c.y&&m>c.m))return; // 不能翻到未来
+  viewYM={y,m};render();
 }
 
 /* ---------- cat mascot ---------- */
@@ -370,18 +387,29 @@ function render(){activeTab==='main'?renderMain():renderWeek();}
 
 function renderMain(){
   const bal=balance();
-  const exp=monthSum('expense'),inc=monthSum('income');
+  const {y,m}=viewYM;
+  const exp=monthSum('expense',y,m),inc=monthSum('income',y,m);
+  const cur=isCurrentYM();
   let h=`<div class="card">
     <div class="bal-label">总结余</div>
     <div class="bal num"><span class="yen">${SYM}</span>${money(bal)}</div>
+    <div class="month-nav">
+      <button id="mPrev" class="m-arrow" aria-label="上个月">‹</button>
+      <div class="month-label">${y}年${m+1}月${cur?' · 本月':''}</div>
+      <button id="mNext" class="m-arrow" aria-label="下个月"${cur?' disabled':''}>›</button>
+    </div>
     <div class="mini-row">
-      <div class="mini exp"><div class="k">本月支出</div><div class="v num">${SYM}${money(exp)}</div></div>
-      <div class="mini inc"><div class="k">本月收入</div><div class="v num">${SYM}${money(inc)}</div></div>
+      <div class="mini exp"><div class="k">支出</div><div class="v num">${SYM}${money(exp)}</div></div>
+      <div class="mini inc"><div class="k">收入</div><div class="v num">${SYM}${money(inc)}</div></div>
     </div>
   </div>`;
-  h+=`<div class="sec-title">全部明细</div>`;
-  h+=txListHTML(data.transactions,'还没有记账哦，点下面的肉垫记第一笔吧～');
+  const list=monthTx(y,m);
+  h+=`<div class="sec-title">${m+1}月明细</div>`;
+  h+=txListHTML(list, cur?'这个月还没记账，点下面的肉垫记第一笔吧～':'这个月没有记录哦');
   document.getElementById('view').innerHTML=h;
+  const p=document.getElementById('mPrev'),n=document.getElementById('mNext');
+  if(p)p.onclick=()=>shiftMonth(-1);
+  if(n)n.onclick=()=>shiftMonth(1);
 }
 
 function renderWeek(){
@@ -514,6 +542,8 @@ function doSave(){
     });
     toast(activeTab==='week'?'记好啦，已同步到主账本 🐾':'记好啦 🐾');
   }
+  const dd=new Date(date+'T00:00:00');
+  viewYM={y:dd.getFullYear(),m:dd.getMonth()};
   save();hideSheets();render();
 }
 function doDelete(){
