@@ -175,6 +175,38 @@
   .foot{text-align:center;font-size:11px;color:var(--ink-soft);margin-top:24px;opacity:.7}
   .foot button{background:none;border:none;color:var(--ink-soft);text-decoration:underline;font-family:inherit;font-size:11px;cursor:pointer}
 
+  body[data-theme="dark"]{
+    --milk:#1F1B17; --cream:#2A251F; --ink:#F3EADC; --ink-soft:#A7967F;
+    --cloud:#3A332B; --line:#3A332B;
+    --shadow:0 8px 24px rgba(0,0,0,.35); --shadow-soft:0 3px 10px rgba(0,0,0,.22);
+  }
+  .streak{display:flex;align-items:center;justify-content:center;gap:7px;background:var(--cream);border-radius:16px;padding:11px 14px;margin-bottom:14px;box-shadow:var(--shadow-soft);font-size:13px;color:var(--ink)}
+  .streak b{font-family:"Baloo 2";color:var(--bean-deep);font-size:17px;margin:0 1px}
+  .budget{margin-top:16px;padding-top:15px;border-top:1px dashed var(--line)}
+  .budget-top{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--ink-soft);margin-bottom:9px}
+  .budget-top b{font-family:"Baloo 2";color:var(--ink)}
+  .budget .rem-over b{color:var(--over)}
+  .set-link{border:none;background:none;color:var(--bean-deep);font-family:"ZCOOL KuaiLe",cursive;font-size:14px;cursor:pointer}
+  .set-link:hover{text-decoration:underline}
+  .search-wrap{margin:0 0 14px}
+  .search-wrap input{width:100%;border:1.5px solid var(--line);background:var(--cream);border-radius:14px;padding:11px 15px;font-family:inherit;font-size:14px;color:var(--ink);outline:none;box-shadow:var(--shadow-soft)}
+  .search-wrap input:focus{border-color:var(--bean)}
+  .search-wrap input::placeholder{color:var(--ink-soft)}
+  .stat-card{background:var(--cream);border-radius:20px;padding:17px 18px;box-shadow:var(--shadow);margin-bottom:16px}
+  .stat-card h4{margin:0 0 14px;font-size:14px;font-weight:700;color:var(--ink);font-family:"ZCOOL KuaiLe",cursive;letter-spacing:.3px}
+  .stat-row{display:flex;align-items:center;gap:11px;margin-bottom:12px}
+  .stat-row:last-child{margin-bottom:2px}
+  .stat-row .se{width:30px;height:30px;border-radius:9px;background:var(--milk);display:flex;align-items:center;justify-content:center;font-size:15px;flex:none}
+  .stat-row .sb{flex:1;min-width:0}
+  .stat-row .sl{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px}
+  .stat-row .sl .sn{color:var(--ink)}
+  .stat-row .sl .sv{color:var(--ink-soft);font-family:"Baloo 2"}
+  .stat-track{height:8px;background:var(--cloud);border-radius:99px;overflow:hidden}
+  .stat-fill{height:100%;border-radius:99px;background:var(--bean);min-width:3px;transition:width .5s cubic-bezier(.2,.8,.2,1)}
+  .quick-add{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px}
+  .quick-add button{border:1.5px solid var(--line);background:var(--milk);border-radius:12px;padding:8px 12px;font-family:inherit;font-size:13px;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+  .quick-add button:hover{border-color:var(--bean);color:var(--bean-deep)}
+  .quick-add .qa-amt{font-family:"Baloo 2";color:var(--ink-soft)}
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
   :focus-visible{outline:3px solid var(--ginger);outline-offset:2px}
   .tail{display:inline-block;animation:sway 3s ease-in-out infinite;transform-origin:bottom center}
@@ -204,7 +236,10 @@
   <div id="view"></div>
 
   <div class="foot">
-    数据只存在你的设备里 · <button id="resetBtn">清空全部</button>
+    <button id="themeBtn">🌙 深色模式</button><br>
+    数据只存在你的设备里<br>
+    <button id="exportBtn">导出备份</button> · <button id="importBtn">导入备份</button> · <button id="resetBtn">清空全部</button>
+    <input id="importFile" type="file" accept="application/json,.json" hidden>
   </div>
 </div>
 
@@ -223,6 +258,8 @@
     <span class="y">¥</span>
     <input id="amtIn" type="text" inputmode="decimal" placeholder="0" maxlength="9">
   </div>
+  <div class="field-lab" id="quickLab">快捷记账</div>
+  <div class="quick-add" id="quickAdd"></div>
   <div class="field-lab">选个分类</div>
   <div class="cat-grid" id="catGrid"></div>
   <div class="row2">
@@ -245,6 +282,18 @@
   <button class="save-btn" id="saveLimit">就这么定啦</button>
 </div>
 
+<!-- monthly budget sheet -->
+<div class="sheet" id="monthLimitSheet">
+  <div class="grab"></div>
+  <h3>设置每月预算</h3>
+  <div class="limit-input">
+    <span class="y">¥</span>
+    <input id="mLimitIn" type="text" inputmode="decimal" placeholder="0" maxlength="9">
+  </div>
+  <div class="quick-row" id="mQuickRow"></div>
+  <button class="save-btn" id="saveMonthLimit">就这么定啦</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -261,9 +310,10 @@ const INC_CATS=[
 ];
 const catMap={};[...EXP_CATS,...INC_CATS].forEach(c=>catMap[c.id]=c);
 
-let data={transactions:[],weeklyLimit:0};
+let data={transactions:[],weeklyLimit:0,monthlyLimit:0,theme:'light'};
 let activeTab='main';
 let viewYM=(function(){const d=new Date();return{y:d.getFullYear(),m:d.getMonth()};})();
+let searchQ='';
 let editingId=null;
 let form={type:'expense',cat:'food'};
 
@@ -276,6 +326,8 @@ async function load(){
   }catch(e){ /* first run / no saved data, keep defaults */ }
   if(!Array.isArray(data.transactions))data.transactions=[];
   if(typeof data.weeklyLimit!=='number')data.weeklyLimit=0;
+  if(typeof data.monthlyLimit!=='number')data.monthlyLimit=0;
+  if(data.theme!=='dark')data.theme='light';
 }
 async function save(){
   try{
@@ -336,6 +388,29 @@ function shiftMonth(delta){
   if(y>c.y||(y===c.y&&m>c.m))return; // 不能翻到未来
   viewYM={y,m};render();
 }
+function localISO(dt){const z=new Date(dt);z.setMinutes(z.getMinutes()-z.getTimezoneOffset());return z.toISOString().slice(0,10);}
+function computeStreak(){
+  const days=new Set(data.transactions.map(t=>t.date));
+  if(!days.size)return 0;
+  let d=new Date(); d.setHours(0,0,0,0);
+  if(!days.has(localISO(d))){ d.setDate(d.getDate()-1); if(!days.has(localISO(d)))return 0; }
+  let n=0;
+  while(days.has(localISO(d))){ n++; d.setDate(d.getDate()-1); }
+  return n;
+}
+function monthCatStats(y,m){
+  const exp=data.transactions.filter(t=>{const d=new Date(t.date+'T00:00:00');return d.getFullYear()===y&&d.getMonth()===m&&t.type==='expense';});
+  const total=exp.reduce((s,t)=>s+t.amount,0);
+  const by={}; exp.forEach(t=>{by[t.cat]=(by[t.cat]||0)+t.amount;});
+  const rows=Object.keys(by).map(cat=>({cat,amt:by[cat],pct:total?by[cat]/total*100:0})).sort((a,b)=>b.amt-a.amt);
+  return {total,rows};
+}
+function applyTheme(){
+  document.body.setAttribute('data-theme', data.theme==='dark'?'dark':'light');
+  const b=document.getElementById('themeBtn'); if(b)b.textContent=data.theme==='dark'?'☀️ 浅色模式':'🌙 深色模式';
+  const meta=document.querySelector('meta[name=theme-color]'); if(meta)meta.content=data.theme==='dark'?'#1F1B17':'#FBF5EC';
+}
+function toggleTheme(){ data.theme=data.theme==='dark'?'light':'dark'; applyTheme(); save(); }
 
 /* ---------- cat mascot ---------- */
 function catSVG(mood){
@@ -390,7 +465,10 @@ function renderMain(){
   const {y,m}=viewYM;
   const exp=monthSum('expense',y,m),inc=monthSum('income',y,m);
   const cur=isCurrentYM();
-  let h=`<div class="card">
+  const streak=computeStreak();
+  let h='';
+  if(streak>0) h+=`<div class="streak">🔥 已连续记账 <b class="num">${streak}</b> 天，奶团猫给你比个心 ♡</div>`;
+  h+=`<div class="card">
     <div class="bal-label">总结余</div>
     <div class="bal num"><span class="yen">${SYM}</span>${money(bal)}</div>
     <div class="month-nav">
@@ -401,15 +479,52 @@ function renderMain(){
     <div class="mini-row">
       <div class="mini exp"><div class="k">支出</div><div class="v num">${SYM}${money(exp)}</div></div>
       <div class="mini inc"><div class="k">收入</div><div class="v num">${SYM}${money(inc)}</div></div>
-    </div>
-  </div>`;
-  const list=monthTx(y,m);
-  h+=`<div class="sec-title">${m+1}月明细</div>`;
-  h+=txListHTML(list, cur?'这个月还没记账，点下面的肉垫记第一笔吧～':'这个月没有记录哦');
+    </div>`;
+  const ml=data.monthlyLimit;
+  if(ml>0){
+    const rem=ml-exp, ratio=ml?exp/ml:0, pct=Math.min(ratio*100,100);
+    const cls=ratio>1?'over':(ratio>=0.85?'warn':'');
+    h+=`<div class="budget">
+      <div class="budget-top">
+        <span>${m+1}月预算 <b class="num">${SYM}${money(ml)}</b></span>
+        <span class="${rem<0?'rem-over':''}">${rem>=0?'剩':'超'} <b class="num">${SYM}${money(Math.abs(rem))}</b></span>
+      </div>
+      <div class="bar-track"><div class="bar-fill ${cls}" style="width:${pct}%"></div></div>
+      <div style="text-align:right;margin-top:8px"><button class="set-link" id="editMonth">改预算</button></div>
+    </div>`;
+  }else{
+    h+=`<div class="budget" style="text-align:center;border-top:1px dashed var(--line);margin-top:16px;padding-top:15px"><button class="set-link" id="editMonth">＋ 设置每月预算</button></div>`;
+  }
+  h+=`</div>`;
+  h+=`<div class="search-wrap"><input id="searchIn" type="text" placeholder="🔍 搜备注或分类" value="${esc(searchQ)}"></div>`;
+  const st=monthCatStats(y,m);
+  if(st.total>0){
+    h+=`<div class="stat-card"><h4>${m+1}月花在哪 · 共 ${SYM}${money(st.total)}</h4>`;
+    st.rows.slice(0,6).forEach(r=>{const c=catMap[r.cat]||{e:'🐾',n:'其他'};
+      h+=`<div class="stat-row"><div class="se">${c.e}</div><div class="sb">
+        <div class="sl"><span class="sn">${c.n}</span><span class="sv">${SYM}${money(r.amt)} · ${r.pct.toFixed(0)}%</span></div>
+        <div class="stat-track"><div class="stat-fill" style="width:${Math.max(r.pct,2)}%"></div></div>
+      </div></div>`;
+    });
+    h+=`</div>`;
+  }
+  h+=`<div class="sec-title">${m+1}月明细</div><div id="txlist"></div>`;
   document.getElementById('view').innerHTML=h;
   const p=document.getElementById('mPrev'),n=document.getElementById('mNext');
   if(p)p.onclick=()=>shiftMonth(-1);
   if(n)n.onclick=()=>shiftMonth(1);
+  const em=document.getElementById('editMonth'); if(em)em.onclick=openMonthLimit;
+  const si=document.getElementById('searchIn'); if(si)si.oninput=()=>{searchQ=si.value;fillTxList();};
+  fillTxList();
+}
+function fillTxList(){
+  const {y,m}=viewYM;
+  let list=monthTx(y,m);
+  const q=searchQ.trim().toLowerCase();
+  if(q) list=list.filter(t=>{const c=catMap[t.cat]||{n:''};return (t.note||'').toLowerCase().includes(q)||c.n.toLowerCase().includes(q);});
+  const el=document.getElementById('txlist'); if(!el)return;
+  const empty=q?'没找到匹配的记录喵 (・_・)':(isCurrentYM()?'这个月还没记账，点下面的肉垫记第一笔吧～':'这个月没有记录哦');
+  el.innerHTML=txListHTML(list,empty);
 }
 
 function renderWeek(){
@@ -493,7 +608,7 @@ function openAdd(){
   document.getElementById('noteIn').value='';
   document.getElementById('dateIn').value=todayISO();
   document.getElementById('delBtn').style.display='none';
-  syncType();renderCats();updateSave();
+  syncType();renderCats();renderQuick();updateSave();
   showSheet('addSheet');
   setTimeout(()=>document.getElementById('amtIn').focus(),300);
 }
@@ -505,8 +620,45 @@ function openEdit(t){
   document.getElementById('noteIn').value=t.note||'';
   document.getElementById('dateIn').value=t.date;
   document.getElementById('delBtn').style.display='block';
+  document.getElementById('quickAdd').style.display='none';
+  document.getElementById('quickLab').style.display='none';
   syncType();renderCats();updateSave();
   showSheet('addSheet');
+}
+function recentQuick(){
+  const seen=new Set(),out=[];
+  const sorted=[...data.transactions].sort((a,b)=>(b.created||0)-(a.created||0));
+  for(const t of sorted){
+    const key=t.type+'|'+t.cat+'|'+(t.note||'')+'|'+t.amount;
+    if(seen.has(key))continue; seen.add(key); out.push(t);
+    if(out.length>=6)break;
+  }
+  return out;
+}
+function renderQuick(){
+  const box=document.getElementById('quickAdd'),lab=document.getElementById('quickLab');
+  const items=recentQuick();
+  if(!items.length){box.innerHTML='';box.style.display='none';lab.style.display='none';return;}
+  box.style.display='flex';lab.style.display='block';
+  box.innerHTML=items.map((t,i)=>{const c=catMap[t.cat]||{e:'🐾',n:'其他'};
+    return `<button data-i="${i}">${c.e} ${t.note?esc(t.note):c.n} <span class="qa-amt">${SYM}${money(t.amount)}</span></button>`;}).join('');
+  Array.from(box.children).forEach((b,i)=>b.onclick=()=>{
+    const t=items[i]; form={type:t.type,cat:t.cat};
+    document.getElementById('amtIn').value=t.amount;
+    document.getElementById('noteIn').value=t.note||'';
+    syncType();renderCats();updateSave();
+  });
+}
+function openMonthLimit(){
+  document.getElementById('mLimitIn').value=data.monthlyLimit||'';
+  document.getElementById('mQuickRow').innerHTML=[1000,2000,3000,5000,8000].map(v=>`<button data-v="${v}">${SYM}${v}</button>`).join('');
+  document.querySelectorAll('#mQuickRow button').forEach(b=>b.onclick=()=>{document.getElementById('mLimitIn').value=b.dataset.v;});
+  showSheet('monthLimitSheet');
+  setTimeout(()=>document.getElementById('mLimitIn').focus(),300);
+}
+function saveMonthLimit(){
+  const v=parseFloat(document.getElementById('mLimitIn').value)||0;
+  data.monthlyLimit=v;save();hideSheets();render();toast('月预算定好啦 🐾');
 }
 function syncType(){
   const exp=form.type==='expense';
@@ -570,11 +722,57 @@ function hideSheets(){
   document.getElementById('scrim').classList.remove('show');
   document.getElementById('addSheet').classList.remove('show');
   document.getElementById('limitSheet').classList.remove('show');
+  document.getElementById('monthLimitSheet').classList.remove('show');
 }
 let toastTimer;
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2000);}
 
 /* ---------- events ---------- */
+/* ---------- backup: export / import ---------- */
+async function exportData(){
+  const payload={app:'MiaoLedger',version:1,exportedAt:new Date().toISOString(),data};
+  const text=JSON.stringify(payload,null,2);
+  const stamp=new Date().toISOString().slice(0,10);
+  const fname=`miao-ledger-backup-${stamp}.json`;
+  // 1) iOS / mobile: share sheet with file (save to Files, send to self, etc.)
+  try{
+    if(navigator.canShare){
+      const file=new File([text],fname,{type:'application/json'});
+      if(navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:'喵记账备份'}); return; }
+    }
+  }catch(e){ if(e&&e.name==='AbortError')return; /* canceled */ }
+  // 2) desktop / Android: download a file
+  try{
+    const blob=new Blob([text],{type:'application/json'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=fname;
+    document.body.appendChild(a);a.click();
+    setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},150);
+    toast('备份已导出 🐾'); return;
+  }catch(e){}
+  // 3) last resort: copy to clipboard
+  try{ await navigator.clipboard.writeText(text); toast('备份已复制到剪贴板，粘到备忘录存好'); }
+  catch(e){ toast('导出失败了喵，换 Safari 再试一次'); }
+}
+function importData(file){
+  const reader=new FileReader();
+  reader.onload=()=>{
+    let d;
+    try{
+      const parsed=JSON.parse(reader.result);
+      d=(parsed&&parsed.data)?parsed.data:parsed; // 兼容带壳/不带壳
+      if(!d||!Array.isArray(d.transactions))throw new Error('bad');
+    }catch(e){ toast('这个文件读不出来喵，请选喵记账导出的备份'); return; }
+    if(!confirm('导入会用备份里的账覆盖当前所有数据，确定吗？')) return;
+    data={transactions:d.transactions,
+          weeklyLimit:typeof d.weeklyLimit==='number'?d.weeklyLimit:0,
+          monthlyLimit:typeof d.monthlyLimit==='number'?d.monthlyLimit:0,
+          theme:d.theme==='dark'?'dark':'light'};
+    applyTheme(); save(); render(); toast('导入成功 🐾');
+  };
+  reader.readAsText(file);
+}
+
 function bind(){
   document.getElementById('tabMain').onclick=()=>{activeTab='main';document.getElementById('tabMain').classList.add('on');document.getElementById('tabWeek').classList.remove('on');render();};
   document.getElementById('tabWeek').onclick=()=>{activeTab='week';document.getElementById('tabWeek').classList.add('on');document.getElementById('tabMain').classList.remove('on');render();};
@@ -586,13 +784,18 @@ function bind(){
   document.getElementById('saveBtn').onclick=doSave;
   document.getElementById('delBtn').onclick=doDelete;
   document.getElementById('saveLimit').onclick=saveLimit;
+  document.getElementById('saveMonthLimit').onclick=saveMonthLimit;
+  document.getElementById('themeBtn').onclick=toggleTheme;
   document.getElementById('view').addEventListener('click',e=>{
     const tx=e.target.closest('.tx');
     if(tx){const t=data.transactions.find(x=>x.id===tx.dataset.id);if(t)openEdit(t);}
   });
+  document.getElementById('exportBtn').onclick=exportData;
+  document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
+  document.getElementById('importFile').onchange=e=>{const f=e.target.files[0];if(f)importData(f);e.target.value='';};
   document.getElementById('resetBtn').onclick=async()=>{
     if(confirm('确定清空全部记账数据吗？这个操作没法撤销喵。')){
-      data={transactions:[],weeklyLimit:0};await save();render();toast('都清空啦');
+      data={transactions:[],weeklyLimit:0,monthlyLimit:0,theme:data.theme};await save();render();toast('都清空啦');
     }
   };
 }
@@ -601,6 +804,7 @@ function bind(){
 (async function(){
   await load();
   bind();
+  applyTheme();
   render();
 })();
 </script>
