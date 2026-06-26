@@ -141,8 +141,8 @@
   .amt-input input::placeholder{color:var(--cloud)}
 
   .field-lab{font-size:12px;color:var(--ink-soft);font-weight:700;letter-spacing:1px;margin:0 2px 9px}
-  .cat-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:18px}
-  .cat-grid button{border:none;background:var(--milk);border-radius:14px;padding:10px 4px;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px;transition:.15s}
+  .cat-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:9px;margin-bottom:18px}
+  .cat-grid button{flex:0 0 calc((100% - 36px)/5);border:none;background:var(--milk);border-radius:14px;padding:10px 4px;cursor:pointer;font-family:inherit;display:flex;flex-direction:column;align-items:center;gap:4px;transition:.15s}
   .cat-grid button .e{font-size:22px}
   .cat-grid button .n{font-size:11px;color:var(--ink-soft)}
   .cat-grid button.on{background:var(--bean);box-shadow:var(--shadow-soft)}
@@ -182,6 +182,10 @@
   }
   .streak{display:flex;align-items:center;justify-content:center;gap:7px;background:var(--cream);border-radius:16px;padding:11px 14px;margin-bottom:14px;box-shadow:var(--shadow-soft);font-size:13px;color:var(--ink)}
   .streak b{font-family:"Baloo 2";color:var(--bean-deep);font-size:17px;margin:0 1px}
+  .payday{display:flex;align-items:center;justify-content:center;gap:6px;position:relative;background:var(--cream);border-radius:16px;padding:11px 44px;margin-bottom:14px;box-shadow:var(--shadow-soft);font-size:13px;color:var(--ink);cursor:pointer}
+  .payday b{font-family:"Baloo 2";color:var(--ginger-deep);font-size:17px;margin:0 1px}
+  .payday .pay-edit{position:absolute;right:11px;top:50%;transform:translateY(-50%);color:var(--ink-soft);font-size:12px;border:1px solid var(--line);border-radius:9px;padding:3px 8px}
+  .badge-pay{font-size:10px;background:var(--ginger);color:#fff;border-radius:6px;padding:1px 7px;font-weight:700;margin-left:7px;letter-spacing:.5px;font-family:"Noto Sans SC",sans-serif}
   .budget{margin-top:16px;padding-top:15px;border-top:1px dashed var(--line)}
   .budget-top{display:flex;justify-content:space-between;align-items:center;font-size:13px;color:var(--ink-soft);margin-bottom:9px}
   .budget-top b{font-family:"Baloo 2";color:var(--ink)}
@@ -236,7 +240,7 @@
   <div id="view"></div>
 
   <div class="foot">
-    <button id="themeBtn">🌙 深色模式</button><br>
+    <button id="settingsBtn">⚙️ 设置</button> · <button id="themeBtn">🌙 深色模式</button><br>
     数据只存在你的设备里<br>
     <button id="exportBtn">导出备份</button> · <button id="importBtn">导入备份</button> · <button id="resetBtn">清空全部</button>
     <input id="importFile" type="file" accept="application/json,.json" hidden>
@@ -294,6 +298,23 @@
   <button class="save-btn" id="saveMonthLimit">就这么定啦</button>
 </div>
 
+<!-- settings sheet -->
+<div class="sheet" id="settingsSheet">
+  <div class="grab"></div>
+  <h3>设置</h3>
+  <div class="field-lab">每次打开先看哪个账本</div>
+  <div class="type-toggle">
+    <button id="dtMain">主账本</button>
+    <button id="dtWeek">本周账本</button>
+  </div>
+  <div class="field-lab">发薪日（每月几号发工资）</div>
+  <div class="row2">
+    <div class="inp"><input id="paydayIn" type="number" min="1" max="28" inputmode="numeric" placeholder="15"></div>
+  </div>
+  <div style="font-size:12px;color:var(--ink-soft);margin:-8px 2px 16px;line-height:1.5">发薪那天明细会标 💰，顶部也会显示离发薪还有几天。遇到周末提前发的，就按这个号数算～</div>
+  <button class="save-btn" id="saveSettings">保存设置</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -310,7 +331,7 @@ const INC_CATS=[
 ];
 const catMap={};[...EXP_CATS,...INC_CATS].forEach(c=>catMap[c.id]=c);
 
-let data={transactions:[],weeklyLimit:0,monthlyLimit:0,theme:'light'};
+let data={transactions:[],weeklyLimit:0,monthlyLimit:0,theme:'light',payday:15,homeTab:'main'};
 let activeTab='main';
 let viewYM=(function(){const d=new Date();return{y:d.getFullYear(),m:d.getMonth()};})();
 let searchQ='';
@@ -328,6 +349,8 @@ async function load(){
   if(typeof data.weeklyLimit!=='number')data.weeklyLimit=0;
   if(typeof data.monthlyLimit!=='number')data.monthlyLimit=0;
   if(data.theme!=='dark')data.theme='light';
+  if(!(data.payday>=1&&data.payday<=28))data.payday=15;
+  if(data.homeTab!=='week')data.homeTab='main';
 }
 async function save(){
   try{
@@ -411,6 +434,37 @@ function applyTheme(){
   const meta=document.querySelector('meta[name=theme-color]'); if(meta)meta.content=data.theme==='dark'?'#1F1B17':'#FBF5EC';
 }
 function toggleTheme(){ data.theme=data.theme==='dark'?'light':'dark'; applyTheme(); save(); }
+let setForm={homeTab:'main'};
+function syncDefaultTabUI(){
+  document.getElementById('dtMain').className=setForm.homeTab==='week'?'':'on-exp';
+  document.getElementById('dtWeek').className=setForm.homeTab==='week'?'on-exp':'';
+}
+function openSettings(){
+  setForm={homeTab:data.homeTab};
+  syncDefaultTabUI();
+  document.getElementById('paydayIn').value=data.payday||15;
+  showSheet('settingsSheet');
+}
+function saveSettings(){
+  let p=parseInt(document.getElementById('paydayIn').value,10);
+  if(!(p>=1&&p<=28))p=15;
+  data.payday=p; data.homeTab=setForm.homeTab;
+  save(); hideSheets(); render(); toast('设置保存啦 🐾');
+}
+function nextPayday(){
+  const t=new Date(); t.setHours(0,0,0,0);
+  let d=new Date(t.getFullYear(),t.getMonth(),data.payday);
+  if(d<t) d=new Date(t.getFullYear(),t.getMonth()+1,data.payday);
+  return d;
+}
+function daysUntilPayday(){
+  const t=new Date(); t.setHours(0,0,0,0);
+  return Math.round((nextPayday()-t)/86400000);
+}
+function syncTabUI(){
+  document.getElementById('tabMain').classList.toggle('on',activeTab==='main');
+  document.getElementById('tabWeek').classList.toggle('on',activeTab==='week');
+}
 
 /* ---------- cat mascot ---------- */
 function catSVG(mood){
@@ -467,6 +521,8 @@ function renderMain(){
   const cur=isCurrentYM();
   const streak=computeStreak();
   let h='';
+  const dleft=daysUntilPayday();
+  h+=`<div class="payday" id="paydayPill">${dleft===0?'💰 今天发薪啦，钱包鼓鼓 🎉':`💰 距离 ${data.payday} 号发薪还有 <b class="num">${dleft}</b> 天`}<button class="pay-edit" id="payEdit">改</button></div>`;
   if(streak>0) h+=`<div class="streak">🔥 已连续记账 <b class="num">${streak}</b> 天，奶团猫给你比个心 ♡</div>`;
   h+=`<div class="card">
     <div class="bal-label">总结余</div>
@@ -514,6 +570,7 @@ function renderMain(){
   if(p)p.onclick=()=>shiftMonth(-1);
   if(n)n.onclick=()=>shiftMonth(1);
   const em=document.getElementById('editMonth'); if(em)em.onclick=openMonthLimit;
+  const pe=document.getElementById('payEdit'); if(pe)pe.onclick=openSettings;
   const si=document.getElementById('searchIn'); if(si)si.oninput=()=>{searchQ=si.value;fillTxList();};
   fillTxList();
 }
@@ -580,7 +637,8 @@ function txListHTML(list,emptyMsg){
   Object.keys(groups).forEach(date=>{
     const items=groups[date];
     const daySum=items.reduce((s,t)=>s+(t.type==='expense'?-t.amount:t.amount),0);
-    h+=`<div class="day-group"><div class="day-head"><span>${fmtDay(date)}</span><span class="d-sum num">${daySum<0?'-':'+'}${SYM}${money(Math.abs(daySum))}</span></div>`;
+    const payBadge=(parseInt(date.slice(8,10),10)===data.payday)?' <span class="badge-pay">💰 发薪日</span>':'';
+    h+=`<div class="day-group"><div class="day-head"><span>${fmtDay(date)}${payBadge}</span><span class="d-sum num">${daySum<0?'-':'+'}${SYM}${money(Math.abs(daySum))}</span></div>`;
     items.forEach(t=>{
       const c=catMap[t.cat]||{e:'🐾',n:'其他'};
       const wk=(t.ledger==='weekly'&&activeTab==='main')?'<span class="badge-week">周</span>':'';
@@ -723,6 +781,7 @@ function hideSheets(){
   document.getElementById('addSheet').classList.remove('show');
   document.getElementById('limitSheet').classList.remove('show');
   document.getElementById('monthLimitSheet').classList.remove('show');
+  document.getElementById('settingsSheet').classList.remove('show');
 }
 let toastTimer;
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2000);}
@@ -767,8 +826,10 @@ function importData(file){
     data={transactions:d.transactions,
           weeklyLimit:typeof d.weeklyLimit==='number'?d.weeklyLimit:0,
           monthlyLimit:typeof d.monthlyLimit==='number'?d.monthlyLimit:0,
-          theme:d.theme==='dark'?'dark':'light'};
-    applyTheme(); save(); render(); toast('导入成功 🐾');
+          theme:d.theme==='dark'?'dark':'light',
+          payday:(d.payday>=1&&d.payday<=28)?d.payday:15,
+          homeTab:d.homeTab==='week'?'week':'main'};
+    applyTheme(); activeTab=data.homeTab==='week'?'week':'main'; syncTabUI(); save(); render(); toast('导入成功 🐾');
   };
   reader.readAsText(file);
 }
@@ -786,6 +847,10 @@ function bind(){
   document.getElementById('saveLimit').onclick=saveLimit;
   document.getElementById('saveMonthLimit').onclick=saveMonthLimit;
   document.getElementById('themeBtn').onclick=toggleTheme;
+  document.getElementById('settingsBtn').onclick=openSettings;
+  document.getElementById('saveSettings').onclick=saveSettings;
+  document.getElementById('dtMain').onclick=()=>{setForm.homeTab='main';syncDefaultTabUI();};
+  document.getElementById('dtWeek').onclick=()=>{setForm.homeTab='week';syncDefaultTabUI();};
   document.getElementById('view').addEventListener('click',e=>{
     const tx=e.target.closest('.tx');
     if(tx){const t=data.transactions.find(x=>x.id===tx.dataset.id);if(t)openEdit(t);}
@@ -795,7 +860,7 @@ function bind(){
   document.getElementById('importFile').onchange=e=>{const f=e.target.files[0];if(f)importData(f);e.target.value='';};
   document.getElementById('resetBtn').onclick=async()=>{
     if(confirm('确定清空全部记账数据吗？这个操作没法撤销喵。')){
-      data={transactions:[],weeklyLimit:0,monthlyLimit:0,theme:data.theme};await save();render();toast('都清空啦');
+      data={transactions:[],weeklyLimit:0,monthlyLimit:0,theme:data.theme,payday:data.payday,homeTab:data.homeTab};await save();render();toast('都清空啦');
     }
   };
 }
@@ -805,6 +870,8 @@ function bind(){
   await load();
   bind();
   applyTheme();
+  activeTab=data.homeTab==='week'?'week':'main';
+  syncTabUI();
   render();
 })();
 </script>
