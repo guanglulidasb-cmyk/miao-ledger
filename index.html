@@ -435,7 +435,8 @@ function weekSpent(){
     .reduce((s,t)=>s+(t.type==='expense'?t.amount:-t.amount),0);
 }
 function balance(){
-  return data.transactions.reduce((s,t)=>s+(t.type==='income'?t.amount:-t.amount),0);
+  const tx=data.transactions.reduce((s,t)=>s+(t.type==='income'?t.amount:-t.amount),0);
+  return tx - savingsTotal();
 }
 function monthSum(type,y,m){
   return data.transactions.filter(t=>{const d=new Date(t.date+'T00:00:00');return d.getFullYear()===y&&d.getMonth()===m&&t.type===type;})
