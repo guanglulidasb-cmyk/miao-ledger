@@ -211,6 +211,14 @@
   .quick-add button{border:1.5px solid var(--line);background:var(--milk);border-radius:12px;padding:8px 12px;font-family:inherit;font-size:13px;color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
   .quick-add button:hover{border-color:var(--bean);color:var(--bean-deep)}
   .quick-add .qa-amt{font-family:"Baloo 2";color:var(--ink-soft)}
+  .save-illu{position:relative;display:inline-block;margin-bottom:2px}
+  .save-illu .coin{position:absolute;right:-6px;bottom:10px;font-size:32px}
+  .bal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:2px}
+  .jar-btn{border:1.5px solid var(--line);background:var(--milk);color:var(--ink);font-family:"ZCOOL KuaiLe",cursive;font-size:13px;padding:7px 11px;border-radius:13px;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+  .jar-btn:hover{border-color:var(--bean);color:var(--bean-deep)}
+  .jar-btn b{color:var(--sage)}
+  .back-btn{border:none;background:none;color:var(--ink-soft);font-family:"ZCOOL KuaiLe",cursive;font-size:15px;cursor:pointer;padding:4px 4px 12px;margin-bottom:2px}
+  .back-btn:hover{color:var(--bean-deep)}
   @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
   :focus-visible{outline:3px solid var(--ginger);outline-offset:2px}
   .tail{display:inline-block;animation:sway 3s ease-in-out infinite;transform-origin:bottom center}
@@ -315,6 +323,38 @@
   <button class="save-btn" id="saveSettings">保存设置</button>
 </div>
 
+<!-- savings sheet -->
+<div class="sheet" id="saveSheet">
+  <div class="grab"></div>
+  <h3 id="saveTitle">存一笔</h3>
+  <div class="type-toggle">
+    <button id="sIn" class="on-inc">存入</button>
+    <button id="sOut">取出</button>
+  </div>
+  <div class="amt-input">
+    <span class="y">¥</span>
+    <input id="sAmtIn" type="text" inputmode="decimal" placeholder="0" maxlength="9">
+  </div>
+  <div class="row2">
+    <div class="inp"><label>备注</label><input id="sNoteIn" type="text" placeholder="攒钱加油喵～" maxlength="20"></div>
+    <div class="inp"><label>日期</label><input id="sDateIn" type="date"></div>
+  </div>
+  <button class="save-btn" id="sSaveBtn">保存</button>
+  <button class="del-btn" id="sDelBtn" style="display:none">删除这一笔</button>
+</div>
+
+<!-- savings goal sheet -->
+<div class="sheet" id="goalSheet">
+  <div class="grab"></div>
+  <h3>设置攒钱目标</h3>
+  <div class="limit-input">
+    <span class="y">¥</span>
+    <input id="goalIn" type="text" inputmode="decimal" placeholder="0" maxlength="9">
+  </div>
+  <div class="quick-row" id="goalQuick"></div>
+  <button class="save-btn" id="saveGoal">就这么定啦</button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -351,6 +391,8 @@ async function load(){
   if(data.theme!=='dark')data.theme='light';
   if(!(data.payday>=1&&data.payday<=28))data.payday=15;
   if(data.homeTab!=='week')data.homeTab='main';
+  if(!Array.isArray(data.savings))data.savings=[];
+  if(typeof data.savingsGoal!=='number')data.savingsGoal=0;
 }
 async function save(){
   try{
@@ -465,6 +507,10 @@ function syncTabUI(){
   document.getElementById('tabMain').classList.toggle('on',activeTab==='main');
   document.getElementById('tabWeek').classList.toggle('on',activeTab==='week');
 }
+let prevTab='main';
+function setTab(name){ activeTab=name; syncTabUI(); render(); }
+function openSavings(){ prevTab=(activeTab==='save'?'main':activeTab); setTab('save'); }
+function backFromSavings(){ setTab(prevTab||'main'); }
 
 /* ---------- cat mascot ---------- */
 function catSVG(mood){
@@ -512,7 +558,17 @@ const OVER_MSGS=[
 ];
 
 /* ---------- render ---------- */
-function render(){activeTab==='main'?renderMain():renderWeek();}
+function render(){
+  updateFab();
+  const seg=document.querySelector('.seg'); if(seg)seg.style.display=activeTab==='save'?'none':'flex';
+  if(activeTab==='save')renderSave();
+  else if(activeTab==='week')renderWeek();
+  else renderMain();
+}
+function updateFab(){
+  const f=document.getElementById('fab'); if(!f)return;
+  f.innerHTML='<span class="pw">🐾</span>'+(activeTab==='save'?'存一笔':'记一笔');
+}
 
 function renderMain(){
   const bal=balance();
@@ -525,7 +581,10 @@ function renderMain(){
   h+=`<div class="payday" id="paydayPill">${dleft===0?'💰 今天发薪啦，钱包鼓鼓 🎉':`💰 距离 ${data.payday} 号发薪还有 <b class="num">${dleft}</b> 天`}<button class="pay-edit" id="payEdit">改</button></div>`;
   if(streak>0) h+=`<div class="streak">🔥 已连续记账 <b class="num">${streak}</b> 天，奶团猫给你比个心 ♡</div>`;
   h+=`<div class="card">
-    <div class="bal-label">总结余</div>
+    <div class="bal-head">
+      <span class="bal-label">总结余</span>
+      <button class="jar-btn" id="jarBtn">🐷 攒钱罐 <b class="num">${SYM}${money(savingsTotal())}</b> ›</button>
+    </div>
     <div class="bal num"><span class="yen">${SYM}</span>${money(bal)}</div>
     <div class="month-nav">
       <button id="mPrev" class="m-arrow" aria-label="上个月">‹</button>
@@ -571,6 +630,7 @@ function renderMain(){
   if(n)n.onclick=()=>shiftMonth(1);
   const em=document.getElementById('editMonth'); if(em)em.onclick=openMonthLimit;
   const pe=document.getElementById('payEdit'); if(pe)pe.onclick=openSettings;
+  const jb=document.getElementById('jarBtn'); if(jb)jb.onclick=openSavings;
   const si=document.getElementById('searchIn'); if(si)si.oninput=()=>{searchQ=si.value;fillTxList();};
   fillTxList();
 }
@@ -782,6 +842,8 @@ function hideSheets(){
   document.getElementById('limitSheet').classList.remove('show');
   document.getElementById('monthLimitSheet').classList.remove('show');
   document.getElementById('settingsSheet').classList.remove('show');
+  document.getElementById('saveSheet').classList.remove('show');
+  document.getElementById('goalSheet').classList.remove('show');
 }
 let toastTimer;
 function toast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2000);}
@@ -828,16 +890,108 @@ function importData(file){
           monthlyLimit:typeof d.monthlyLimit==='number'?d.monthlyLimit:0,
           theme:d.theme==='dark'?'dark':'light',
           payday:(d.payday>=1&&d.payday<=28)?d.payday:15,
-          homeTab:d.homeTab==='week'?'week':'main'};
+          homeTab:d.homeTab==='week'?'week':'main',
+          savings:Array.isArray(d.savings)?d.savings:[],
+          savingsGoal:typeof d.savingsGoal==='number'?d.savingsGoal:0};
     applyTheme(); activeTab=data.homeTab==='week'?'week':'main'; syncTabUI(); save(); render(); toast('导入成功 🐾');
   };
   reader.readAsText(file);
 }
 
+/* ---------- savings jar 攒钱罐 ---------- */
+let sForm={type:'in'};
+let sEditingId=null;
+function savingsTotal(){ return data.savings.reduce((s,t)=>s+(t.type==='out'?-t.amount:t.amount),0); }
+function renderSave(){
+  const total=savingsTotal(), goal=data.savingsGoal;
+  let mood='happy';
+  if(goal>0){const r=total/goal; mood=r>=1?'happy':(r>=0.5?'calm':'none');}
+  let h=`<button class="back-btn" id="backBtn">‹ 返回</button>
+  <div class="card" style="text-align:center">
+    <div class="save-illu">${catSVG(mood)}<span class="coin">🪙</span></div>
+    <div class="bal-label">已经攒了</div>
+    <div class="bal num"><span class="yen">${SYM}</span>${money(total)}</div>`;
+  if(goal>0){
+    const rem=goal-total, ratio=goal?total/goal:0, pct=Math.min(Math.max(ratio*100,0),100), done=total>=goal;
+    h+=`<div class="bar-track" style="margin-top:16px"><div class="bar-fill" style="width:${pct}%;background:var(--sage)"></div></div>
+      <div class="bar-meta" style="margin-top:8px">
+        <span>目标 <b class="num">${SYM}${money(goal)}</b></span>
+        <span>${done?'已达成 🎉':('还差 <b class="num">'+SYM+money(Math.abs(rem))+'</b>')}</span>
+      </div>
+      <div style="margin-top:12px">${done?'<span style="color:var(--sage);font-weight:600">攒满啦！奶团猫为你转圈圈 🎉</span>':'<button class="set-link" id="editGoal">改目标</button>'}</div>`;
+  }else{
+    h+=`<div style="margin-top:16px"><button class="set-link" id="editGoal">＋ 设一个攒钱目标</button></div>`;
+  }
+  h+=`</div><div class="sec-title">存取记录</div><div id="slist"></div>`;
+  document.getElementById('view').innerHTML=h;
+  const eg=document.getElementById('editGoal'); if(eg)eg.onclick=openGoal;
+  const bb=document.getElementById('backBtn'); if(bb)bb.onclick=backFromSavings;
+  document.getElementById('slist').innerHTML=savingsListHTML(data.savings);
+}
+function savingsListHTML(list){
+  if(!list.length) return `<div class="empty">${catSVG('happy')}<p>还没往罐子里存钱喵，点下面的肉垫存第一笔吧～</p></div>`;
+  const sorted=[...list].sort((a,b)=> a.date<b.date?1:a.date>b.date?-1:((b.created||0)-(a.created||0)));
+  const groups={}; sorted.forEach(t=>{(groups[t.date]=groups[t.date]||[]).push(t);});
+  let h='';
+  Object.keys(groups).forEach(date=>{
+    h+=`<div class="day-group"><div class="day-head"><span>${fmtDay(date)}</span></div>`;
+    groups[date].forEach(t=>{
+      h+=`<div class="tx" data-sid="${t.id}">
+        <div class="ic">${t.type==='out'?'💸':'🐷'}</div>
+        <div class="info"><div class="cat">${t.type==='out'?'取出':'存入'}</div>${t.note?`<div class="note">${esc(t.note)}</div>`:''}</div>
+        <div class="amt ${t.type==='out'?'exp':'inc'} num">${t.type==='out'?'-':'+'}${SYM}${money(t.amount)}</div>
+      </div>`;
+    });
+    h+=`</div>`;
+  });
+  return h;
+}
+function openSave(t){
+  sEditingId=(t&&t.id)?t.id:null;
+  sForm={type:(t&&t.type)||'in'};
+  document.getElementById('saveTitle').textContent=sEditingId?'编辑这一笔':'存一笔';
+  document.getElementById('sAmtIn').value=(t&&t.amount)?t.amount:'';
+  document.getElementById('sNoteIn').value=(t&&t.note)||'';
+  document.getElementById('sDateIn').value=(t&&t.date)||todayISO();
+  document.getElementById('sDelBtn').style.display=sEditingId?'block':'none';
+  syncSType();
+  showSheet('saveSheet');
+  if(!sEditingId)setTimeout(()=>document.getElementById('sAmtIn').focus(),300);
+}
+function syncSType(){
+  const isIn=sForm.type==='in';
+  document.getElementById('sIn').className=isIn?'on-inc':'';
+  document.getElementById('sOut').className=isIn?'':'on-exp';
+}
+function sSave(){
+  const amt=parseFloat(document.getElementById('sAmtIn').value);
+  if(!(amt>0)){toast('填个金额喵～');return;}
+  const note=document.getElementById('sNoteIn').value.trim();
+  const date=document.getElementById('sDateIn').value||todayISO();
+  if(sEditingId){
+    const t=data.savings.find(x=>x.id===sEditingId);
+    if(t){t.amount=amt;t.type=sForm.type;t.note=note;t.date=date;}
+    toast('改好啦 🐾');
+  }else{
+    data.savings.push({id:Date.now()+'-'+Math.random().toString(36).slice(2,6),created:Date.now(),amount:amt,type:sForm.type,note,date});
+    toast(sForm.type==='out'?'取出记好啦':'存进去啦，棒棒！🐷');
+  }
+  save();hideSheets();render();
+}
+function sDelete(){ data.savings=data.savings.filter(x=>x.id!==sEditingId); save();hideSheets();render();toast('删掉啦'); }
+function openGoal(){
+  document.getElementById('goalIn').value=data.savingsGoal||'';
+  document.getElementById('goalQuick').innerHTML=[1000,3000,5000,10000,20000].map(v=>`<button data-v="${v}">${SYM}${v}</button>`).join('');
+  document.querySelectorAll('#goalQuick button').forEach(b=>b.onclick=()=>{document.getElementById('goalIn').value=b.dataset.v;});
+  showSheet('goalSheet');
+  setTimeout(()=>document.getElementById('goalIn').focus(),300);
+}
+function saveGoal(){ const v=parseFloat(document.getElementById('goalIn').value)||0; data.savingsGoal=v;save();hideSheets();render();toast('目标定好啦 🐾'); }
+
 function bind(){
-  document.getElementById('tabMain').onclick=()=>{activeTab='main';document.getElementById('tabMain').classList.add('on');document.getElementById('tabWeek').classList.remove('on');render();};
-  document.getElementById('tabWeek').onclick=()=>{activeTab='week';document.getElementById('tabWeek').classList.add('on');document.getElementById('tabMain').classList.remove('on');render();};
-  document.getElementById('fab').onclick=openAdd;
+  document.getElementById('tabMain').onclick=()=>setTab('main');
+  document.getElementById('tabWeek').onclick=()=>setTab('week');
+  document.getElementById('fab').onclick=()=>{ activeTab==='save'?openSave():openAdd(); };
   document.getElementById('scrim').onclick=hideSheets;
   document.getElementById('tExp').onclick=()=>{form.type='expense';syncType();renderCats();};
   document.getElementById('tInc').onclick=()=>{form.type='income';syncType();renderCats();};
@@ -851,16 +1005,23 @@ function bind(){
   document.getElementById('saveSettings').onclick=saveSettings;
   document.getElementById('dtMain').onclick=()=>{setForm.homeTab='main';syncDefaultTabUI();};
   document.getElementById('dtWeek').onclick=()=>{setForm.homeTab='week';syncDefaultTabUI();};
+  document.getElementById('sIn').onclick=()=>{sForm.type='in';syncSType();};
+  document.getElementById('sOut').onclick=()=>{sForm.type='out';syncSType();};
+  document.getElementById('sSaveBtn').onclick=sSave;
+  document.getElementById('sDelBtn').onclick=sDelete;
+  document.getElementById('saveGoal').onclick=saveGoal;
   document.getElementById('view').addEventListener('click',e=>{
     const tx=e.target.closest('.tx');
-    if(tx){const t=data.transactions.find(x=>x.id===tx.dataset.id);if(t)openEdit(t);}
+    if(!tx)return;
+    if(tx.dataset.sid){const t=data.savings.find(x=>x.id===tx.dataset.sid);if(t)openSave(t);return;}
+    const t=data.transactions.find(x=>x.id===tx.dataset.id);if(t)openEdit(t);
   });
   document.getElementById('exportBtn').onclick=exportData;
   document.getElementById('importBtn').onclick=()=>document.getElementById('importFile').click();
   document.getElementById('importFile').onchange=e=>{const f=e.target.files[0];if(f)importData(f);e.target.value='';};
   document.getElementById('resetBtn').onclick=async()=>{
     if(confirm('确定清空全部记账数据吗？这个操作没法撤销喵。')){
-      data={transactions:[],weeklyLimit:0,monthlyLimit:0,theme:data.theme,payday:data.payday,homeTab:data.homeTab};await save();render();toast('都清空啦');
+      data={transactions:[],weeklyLimit:0,monthlyLimit:0,theme:data.theme,payday:data.payday,homeTab:data.homeTab,savings:[],savingsGoal:0};await save();render();toast('都清空啦');
     }
   };
 }
