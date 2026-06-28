@@ -645,15 +645,25 @@ function fillTxList(){
   el.innerHTML=txListHTML(list,empty);
 }
 
+function daysLeftInWeek(){
+  const idx=(new Date().getDay()+6)%7; // Mon=0 ... Sun=6
+  return 7-idx; // 含今天，周日=1
+}
 function renderWeek(){
   const limit=data.weeklyLimit, spent=weekSpent();
   const rem=limit-spent;
   let ratio=limit>0?spent/limit:0;
+  const dleft=daysLeftInWeek(), lastDay=dleft===1;
   let mood,msg,msgAlert=false;
   if(limit<=0){mood='none';msg='先给自己定个每周花销额度吧，本喵帮你盯着～';}
   else if(ratio>1){mood='over';msg=OVER_MSGS[Math.floor(Math.random()*OVER_MSGS.length)];msgAlert=true;}
-  else if(ratio>=0.85){mood='nervous';msg='快到额度啦，剩下的几天悠着点喵 (˙꒳˙ )';}
-  else if(ratio>=0.5){mood='calm';msg='节奏不错，继续保持喵～';}
+  else if(lastDay){
+    mood='happy';
+    msg= rem>0 ? `今天周日，这周稳稳守住啦，还剩 ${SYM}${money(rem)} 没花，奶团猫给你鼓掌 👏`
+              : '今天周日，正好压线守住，厉害喵 👏';
+  }
+  else if(ratio>=0.85){mood='nervous';msg=`快到额度啦，本周还剩 ${dleft} 天，悠着点喵 (˙꒳˙ )`;}
+  else if(ratio>=0.5){mood='calm';msg=`节奏不错，本周还剩 ${dleft} 天，继续保持喵～`;}
   else{mood='happy';msg='花得很克制，本喵给你打呼噜奖励 (=^･ω･^=)';}
 
   const fillCls=ratio>1?'over':(ratio>=0.85?'warn':'');
